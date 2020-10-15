@@ -37,10 +37,12 @@ let horizontalBoard = [
     ' 12',
 ];
 let cornerBoard = ' * ';
+
 let playersTurn = 1;
 let history = [];
 
 let tab = board(formatTab, emptyCase, pawnBlack, pawnWhite);
+console.log(displayBoard());
 
 function board(formatTab, emptyCase, pawnBlack, pawnWhite) {
     let tab = [];
@@ -92,22 +94,38 @@ function board(formatTab, emptyCase, pawnBlack, pawnWhite) {
                 }
             }
         }
+
         tab.push(line);
     }
     return tab;
 }
 
 function displayBoard() {
-    return tab.join('\n').replace(/,/g, '') + '\n------------------------------';
+    return (
+        tab.join('\n').replace(/,/g, '') + '\n==============================\n'
+    );
 }
 
 function movePawn(X, Y, endX, endY) {
+    let validateEat = validationEat(X, Y, endX, endY);
     let validateMove = validationMove(X, Y, endX, endY);
 
     if (validateMove[0] === true) {
         history.push([X, Y, endX, endY]);
 
         tab[endX][endY] = tab[X][Y];
+
+        tab[X][Y] = emptyCase;
+
+        if (validateEat[0] === true) {
+            tab[validateEat[1]][validateEat[2]] = emptyCase;
+        }
+
+        let playerMustEat = obligationToEat();
+
+        if (!(playerMustEat[0] === true && validateEat[0] === true)) {
+            playersTurn++;
+        }
 
         if (endX === 1 && tab[endX][endY] === pawnWhite) {
             tab[endX][endY] = QueenWhite;
@@ -117,22 +135,28 @@ function movePawn(X, Y, endX, endY) {
             tab[endX][endY] = QueenBlack;
         }
 
-        tab[X][Y] = emptyCase;
+        console.log(playerMustEat + ' ' + validateEat);
 
-        playersTurn++;
-
-        return displayBoard();
+        return displayBoard(X, Y, endX, endY);
     } else {
         return validateMove[1];
     }
 }
 
 function validationMove(X, Y, endX, endY) {
+    let validateToEat = obligationToEat();
+
     if (
         (playersTurn % 2 === 0 && tab[X][Y] === pawnWhite) ||
-        (playersTurn % 2 === 1 && tab[X][Y] === pawnBlack)
+        (playersTurn % 2 === 1 && tab[X][Y] === pawnBlack) ||
+        (playersTurn % 2 === 0 && tab[X][Y] === QueenWhite) ||
+        (playersTurn % 2 === 1 && tab[X][Y] === QueenBlack)
     ) {
         return [false, 'a l autre de jouer'];
+    }
+
+    if (!(X >= 1 && Y >= 1 && X <= formatTab - 2 && Y <= formatTab - 2)) {
+        return [false, 'dehors board'];
     }
 
     if (tab[X][Y] === emptyCase) {
@@ -143,19 +167,13 @@ function validationMove(X, Y, endX, endY) {
         return [false, 'arrive = depart'];
     }
 
-    if (tab[endX][endY] !== emptyCase) {
-        return [false, 'il y a un pion'];
-    }
-
-    if (!(X >= 1 && Y >= 1 && X <= formatTab - 2 && Y <= formatTab - 2)) {
-        return [false, 'dehors board'];
-    }
-
     if (!(Math.abs(X - endX) === Math.abs(Y - endY))) {
         return [false, 'que en diagognale'];
     }
 
-    let validateToEat = obligationToEat();
+    if (tab[endX][endY] !== emptyCase) {
+        return [false, 'il y a un pion'];
+    }
 
     if (
         validateToEat[0] === true &&
@@ -178,26 +196,51 @@ function validationMove(X, Y, endX, endY) {
 }
 
 function validationEat(X, Y, endX, endY) {
-    let sensX = X < endX ? -1 : 1;
-    let sensY = Y < endY ? -1 : 1;
+    let colorPawn = playersTurn % 2 === 0 ? pawnBlack : pawnWhite;
+    let colorQueen = playersTurn % 2 === 0 ? QueenBlack : QueenWhite;
 
-    if (tab[endX + sensX][endY + sensY] !== emptyCase) {
-        tab[endX + sensX][endY + sensY] = emptyCase;
-        return [true];
+    if (tab[X][Y] === colorPawn) {
+        let sensX = X < endX ? -1 : 1;
+        let sensY = Y < endY ? -1 : 1;
+
+        if (
+            tab[endX + sensX][endY + sensY] !== emptyCase &&
+            tab[endX + sensX][endY + sensY] !== colorPawn &&
+            tab[endX + sensX][endY + sensY] !== colorQueen
+        ) {
+            return [true, endX + sensX, endY + sensY];
+        }
+        return [false];
     }
-    return [false, 'deplacement 1 case ou 2 pour mager (validationEat)'];
+
+    if (tab[X][Y] === colorQueen) {
+        let sensX = X < endX ? 1 : -1;
+        let sensY = Y < endY ? 1 : -1;
+
+        for (let i = X + sensX, j = Y + sensY; i != endX; i += sensX, j += sensY) {
+            if (
+                tab[i][j] !== emptyCase &&
+                tab[i][j] !== colorQueen &&
+                tab[i][j] !== colorPawn
+            ) {
+                return [true, i, j];
+            }
+        }
+        return [false];
+    }
 }
 
 function obligationToEat() {
     let colorPawn = playersTurn % 2 === 0 ? pawnBlack : pawnWhite;
-    let repeat = formatTab - 1;
+    let colorQueen = playersTurn % 2 === 0 ? QueenBlack : QueenWhite;
 
-    for (let i = 1; i < repeat; i++) {
-        for (let j = 1; j < repeat; j++) {
+    for (let i = 1; i < formatTab; i++) {
+        for (let j = 1; j < formatTab; j++) {
             if (tab[i][j] === colorPawn) {
-                if (i + 2 < repeat && j + 2 < repeat) {
+                if (i + 2 < formatTab && j + 2 < formatTab) {
                     if (
                         tab[i + 1][j + 1] !== colorPawn &&
+                        tab[i + 1][j + 1] !== colorQueen &&
                         tab[i + 1][j + 1] !== emptyCase &&
                         tab[i + 2][j + 2] === emptyCase
                     ) {
@@ -208,6 +251,7 @@ function obligationToEat() {
                 if (i - 2 > 0 && j - 2 > 0) {
                     if (
                         tab[i - 1][j - 1] !== colorPawn &&
+                        tab[i - 1][j - 1] !== colorQueen &&
                         tab[i - 1][j - 1] !== emptyCase &&
                         tab[i - 2][j - 2] === emptyCase
                     ) {
@@ -215,9 +259,10 @@ function obligationToEat() {
                     }
                 }
 
-                if (i - 2 > 0 && j + 2 < repeat) {
+                if (i - 2 > 0 && j + 2 < formatTab) {
                     if (
                         tab[i - 1][j + 1] !== colorPawn &&
+                        tab[i - 1][j + 1] !== colorQueen &&
                         tab[i - 1][j + 1] !== emptyCase &&
                         tab[i - 2][j + 2] === emptyCase
                     ) {
@@ -225,9 +270,10 @@ function obligationToEat() {
                     }
                 }
 
-                if (i + 2 < repeat && j - 2 > 0) {
+                if (i + 2 < formatTab && j - 2 > 0) {
                     if (
                         tab[i + 1][j - 1] !== colorPawn &&
+                        tab[i + 1][j - 1] !== colorQueen &&
                         tab[i + 1][j - 1] !== emptyCase &&
                         tab[i + 2][j - 2] === emptyCase
                     ) {
@@ -235,16 +281,15 @@ function obligationToEat() {
                     }
                 }
             }
+
+            if (tab[i][j] === colorQueen) {
+            }
         }
     }
     return [false];
 }
 
 function validationPawn(X, Y, endX, endY) {
-    if (Math.abs(X - endX) > 2 && Math.abs(Y - endY) > 2) {
-        return [false, 'deplacement 1 case ou 2 pour mager (validationPawn)'];
-    }
-
     if (Math.abs(X - endX) === 1 && Math.abs(Y - endY) === 1) {
         return [true];
     }
@@ -259,11 +304,7 @@ function validationQueen(X, Y, endX, endY) {
     let sensY = Y < endY ? 1 : -1;
 
     if (X !== endX && Y !== endY) {
-        for (
-            let i = X + sensX, j = Y + sensY;
-            i < endX || j < endY;
-            i += sensX, j += sensY
-        ) {
+        for (let i = X + sensX, j = Y + sensY; i != endX; i += sensX, j += sensY) {
             if (tab[i][j] !== emptyCase) {
                 return validationEat(X, Y, endX, endY);
             }
@@ -272,12 +313,27 @@ function validationQueen(X, Y, endX, endY) {
     }
 }
 
-console.log(displayBoard());
+// probleme dame saute deux pions adverse
+// probleme obligationEat
 
 console.log(movePawn(6, 1, 5, 2));
-console.log(movePawn(3, 2, 4, 3));
+console.log(movePawn(3, 2, 4, 1));
+console.log(movePawn(7, 2, 6, 1));
+console.log(movePawn(3, 8, 4, 7));
 console.log(movePawn(6, 3, 5, 4));
-console.log(movePawn(2, 1, 3, 2));
-console.log(movePawn(4, 3, 6, 1));
-
-console.log('HISTORY\n-------\n' + history.join('\n-------\n'));
+console.log(movePawn(4, 1, 6, 3));
+console.log(movePawn(6, 3, 4, 5));
+console.log(movePawn(6, 5, 5, 4));
+console.log(movePawn(4, 5, 6, 3));
+console.log(movePawn(7, 4, 6, 5));
+console.log(movePawn(4, 7, 5, 8));
+console.log(movePawn(8, 1, 7, 2));
+console.log(movePawn(6, 3, 8, 1));
+console.log(movePawn(6, 5, 5, 4));
+console.log(movePawn(8, 1, 4, 5));
+console.log(movePawn(8, 5, 7, 4));
+console.log(movePawn(4, 5, 7, 2));
+console.log(movePawn(6, 7, 5, 6));
+console.log(movePawn(2, 7, 3, 8));
+console.log(movePawn(7, 4, 6, 3));
+console.log(movePawn(7, 2, 4, 5));
